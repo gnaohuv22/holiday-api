@@ -1,103 +1,351 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect } from 'react';
+import ThemeToggle from '@/components/ThemeToggle';
+import { Holiday } from '@/types/holiday';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  // State for holidays list
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [year, setYear] = useState<string>(new Date().getFullYear().toString());
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // State for form
+  const [showForm, setShowForm] = useState<boolean>(false);
+  const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
+  const [currentHoliday, setCurrentHoliday] = useState<Holiday>({
+    date: new Date().toISOString(),
+    name: '',
+    description: '',
+  });
+
+  // Fetch holidays for the selected year
+  const fetchHolidays = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch(`/api/holidays?year=${year}`);
+      
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setHolidays(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Failed to fetch holidays:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
+    fetchHolidays();
+  }, [year]);
+
+  // Handle form submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      setError(null);
+
+      const url = formMode === 'create' 
+        ? '/api/holidays' 
+        : `/api/holidays/${currentHoliday.id}`;
+      
+      const method = formMode === 'create' ? 'POST' : 'PUT';
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(currentHoliday),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Error: ${response.status}`);
+      }
+      
+      // Refresh the list
+      fetchHolidays();
+      
+      // Reset form
+      resetForm();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Failed to save holiday:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle delete
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this holiday?')) {
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch(`/api/holidays/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Error: ${response.status}`);
+      }
+      
+      // Refresh the list
+      fetchHolidays();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Failed to delete holiday:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle edit
+  const handleEdit = (holiday: Holiday) => {
+    setCurrentHoliday(holiday);
+    setFormMode('edit');
+    setShowForm(true);
+  };
+
+  // Reset form
+  const resetForm = () => {
+    setCurrentHoliday({
+      date: new Date().toISOString(),
+      name: '',
+      description: '',
+    });
+    setFormMode('create');
+    setShowForm(false);
+  };
+
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
+  };
+
+  return (
+    <main className="min-h-screen p-6 md:p-12">
+      <div className="max-w-5xl mx-auto">
+        <header className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Holiday Handler API</h1>
+          <ThemeToggle />
+        </header>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4">Documentation</h2>
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-medium">Endpoints</h3>
+              <ul className="ml-6 list-disc space-y-2 mt-2">
+                <li><code>GET /api/holidays?year=2025</code> - Get holidays for a specific year</li>
+                <li><code>POST /api/holidays</code> - Create a new holiday</li>
+                <li><code>PUT /api/holidays/[id]</code> - Update a holiday</li>
+                <li><code>DELETE /api/holidays/[id]</code> - Delete a holiday</li>
+              </ul>
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Holiday List</h2>
+            <div className="flex space-x-4 items-center">
+              <div className="flex items-center space-x-2">
+                <label htmlFor="year" className="font-medium">Year:</label>
+                <select
+                  id="year"
+                  value={year}
+                  onChange={(e) => setYear(e.target.value)}
+                  className="border dark:border-gray-600 rounded-md px-2 py-1"
+                >
+                  {Array.from({ length: 10 }, (_, i) => {
+                    const yearOption = new Date().getFullYear() - 2 + i;
+                    return (
+                      <option key={yearOption} value={yearOption}>
+                        {yearOption}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              <button
+                onClick={() => {
+                  setShowForm(!showForm);
+                  setFormMode('create');
+                  if (!showForm) {
+                    setCurrentHoliday({
+                      date: new Date().toISOString(),
+                      name: '',
+                      description: '',
+                    });
+                  }
+                }}
+                className="btn"
+              >
+                {showForm ? 'Cancel' : 'Add Holiday'}
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-100 p-3 rounded-md mb-4">
+              {error}
+            </div>
+          )}
+
+          {showForm && (
+            <form onSubmit={handleSubmit} className="mb-6 p-4 border dark:border-gray-700 rounded-lg">
+              <h3 className="text-lg font-medium mb-4">
+                {formMode === 'create' ? 'Add New Holiday' : 'Edit Holiday'}
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label htmlFor="name" className="block font-medium mb-1">
+                    Holiday Name
+                  </label>
+                  <input
+                    type="text"
+                    id="name"
+                    value={currentHoliday.name}
+                    onChange={(e) => setCurrentHoliday({ ...currentHoliday, name: e.target.value })}
+                    className="w-full border dark:border-gray-600"
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="date" className="block font-medium mb-1">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    id="date"
+                    value={currentHoliday.date ? currentHoliday.date.substring(0, 10) : ''}
+                    onChange={(e) => {
+                      const newDate = new Date(e.target.value);
+                      newDate.setHours(0, 0, 0, 0);
+                      setCurrentHoliday({
+                        ...currentHoliday,
+                        date: newDate.toISOString(),
+                      });
+                    }}
+                    className="w-full border dark:border-gray-600"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="mb-4">
+                <label htmlFor="description" className="block font-medium mb-1">
+                  Description
+                </label>
+                <textarea
+                  id="description"
+                  value={currentHoliday.description || ''}
+                  onChange={(e) => setCurrentHoliday({ ...currentHoliday, description: e.target.value })}
+                  className="w-full border dark:border-gray-600 h-24"
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="px-4 py-2 border dark:border-gray-600 rounded-md"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-success"
+                  disabled={loading}
+                >
+                  {loading
+                    ? 'Saving...'
+                    : formMode === 'create'
+                    ? 'Create Holiday'
+                    : 'Update Holiday'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {loading && !showForm ? (
+            <p className="text-center py-4">Loading holidays...</p>
+          ) : holidays.length === 0 ? (
+            <p className="text-center py-4">No holidays found for {year}.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead>
+                  <tr className="bg-gray-100 dark:bg-gray-700">
+                    <th>Date</th>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {holidays.map((holiday) => (
+                    <tr key={holiday.id} className="border-b dark:border-gray-700">
+                      <td>{formatDate(holiday.date)}</td>
+                      <td>{holiday.name}</td>
+                      <td>{holiday.description}</td>
+                      <td className="flex space-x-2">
+                        <button
+                          onClick={() => handleEdit(holiday)}
+                          className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => holiday.id && handleDelete(holiday.id)}
+                          className="px-3 py-1 text-sm bg-red-600 hover:bg-red-700 text-white rounded"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-semibold mb-4">API Testing</h2>
+          <div className="space-y-4">
+            <p>
+              You can test the API endpoints using tools like Postman, cURL, or directly from your application.
+            </p>
+            <p>
+              This interface provides a simple way to manage holidays and test the basic functionality.
+            </p>
+            <div className="mt-4">
+              <h3 className="text-lg font-medium">Sample Request</h3>
+              <pre className="bg-gray-100 dark:bg-gray-900 p-4 rounded-md overflow-x-auto mt-2">
+                {`fetch('/api/holidays?year=2024')
+  .then(response => response.json())
+  .then(data => console.log(data))
+  .catch(error => console.error('Error:', error));`}
+              </pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
   );
 }
