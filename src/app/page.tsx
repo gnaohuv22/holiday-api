@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import ThemeToggle from '@/components/ThemeToggle';
 import { Holiday } from '@/types/holiday';
 
@@ -15,13 +15,13 @@ export default function Home() {
   const [showForm, setShowForm] = useState<boolean>(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [currentHoliday, setCurrentHoliday] = useState<Holiday>({
-    date: new Date().toISOString(),
+    startDate: new Date().toISOString(),
     name: '',
     description: '',
   });
 
   // Fetch holidays for the selected year
-  const fetchHolidays = async () => {
+  const fetchHolidays = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -39,12 +39,12 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [year]);
 
   // Initial load
   useEffect(() => {
     fetchHolidays();
-  }, [year]);
+  }, [fetchHolidays]);
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -124,7 +124,7 @@ export default function Home() {
   // Reset form
   const resetForm = () => {
     setCurrentHoliday({
-      date: new Date().toISOString(),
+      startDate: new Date().toISOString(),
       name: '',
       description: '',
     });
@@ -156,6 +156,9 @@ export default function Home() {
                 <li><code>POST /api/holidays</code> - Create a new holiday</li>
                 <li><code>PUT /api/holidays/[id]</code> - Update a holiday</li>
                 <li><code>DELETE /api/holidays/[id]</code> - Delete a holiday</li>
+                <li><code>GET /api/holidays/upcoming</code> - Get upcoming holidays</li>
+                <li><code>GET /api/holidays/in-range?start=2025-02-01&end=2025-02-28</code> - Filter holidays by date range</li>
+                <li><code>POST /api/holidays/import-static</code> - Import static Vietnamese holidays</li>
               </ul>
             </div>
           </div>
@@ -189,7 +192,7 @@ export default function Home() {
                   setFormMode('create');
                   if (!showForm) {
                     setCurrentHoliday({
-                      date: new Date().toISOString(),
+                      startDate: new Date().toISOString(),
                       name: '',
                       description: '',
                     });
@@ -228,19 +231,19 @@ export default function Home() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="date" className="block font-medium mb-1">
+                  <label htmlFor="startDate" className="block font-medium mb-1">
                     Date
                   </label>
                   <input
                     type="date"
-                    id="date"
-                    value={currentHoliday.date ? currentHoliday.date.substring(0, 10) : ''}
+                    id="startDate"
+                    value={currentHoliday.startDate ? currentHoliday.startDate.substring(0, 10) : ''}
                     onChange={(e) => {
                       const newDate = new Date(e.target.value);
                       newDate.setHours(0, 0, 0, 0);
                       setCurrentHoliday({
                         ...currentHoliday,
-                        date: newDate.toISOString(),
+                        startDate: newDate.toISOString(),
                       });
                     }}
                     className="w-full border dark:border-gray-600"
@@ -256,66 +259,100 @@ export default function Home() {
                   id="description"
                   value={currentHoliday.description || ''}
                   onChange={(e) => setCurrentHoliday({ ...currentHoliday, description: e.target.value })}
-                  className="w-full border dark:border-gray-600 h-24"
-                />
+                  className="w-full border dark:border-gray-600"
+                  rows={3}
+                ></textarea>
               </div>
-              <div className="flex justify-end space-x-2">
+              <div className="flex items-center mb-4">
+                <input
+                  type="checkbox"
+                  id="isRecurring"
+                  checked={currentHoliday.isRecurring || false}
+                  onChange={(e) => setCurrentHoliday({ ...currentHoliday, isRecurring: e.target.checked })}
+                  className="mr-2"
+                />
+                <label htmlFor="isRecurring" className="font-medium">Recurring Yearly</label>
+              </div>
+              <div className="mb-4">
+                <label htmlFor="type" className="block font-medium mb-1">
+                  Type
+                </label>
+                <select
+                  id="type"
+                  value={currentHoliday.type || 'dynamic'}
+                  onChange={(e) => setCurrentHoliday({ 
+                    ...currentHoliday, 
+                    type: e.target.value as 'static' | 'dynamic'
+                  })}
+                  className="w-full border dark:border-gray-600"
+                >
+                  <option value="static">Static Holiday</option>
+                  <option value="dynamic">Dynamic Holiday</option>
+                </select>
+              </div>
+              <div className="flex justify-end space-x-4">
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="px-4 py-2 border dark:border-gray-600 rounded-md"
+                  className="btn-secondary"
+                  disabled={loading}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn btn-success"
+                  className="btn"
                   disabled={loading}
                 >
-                  {loading
-                    ? 'Saving...'
-                    : formMode === 'create'
-                    ? 'Create Holiday'
-                    : 'Update Holiday'}
+                  {loading ? 'Saving...' : formMode === 'create' ? 'Create Holiday' : 'Update Holiday'}
                 </button>
               </div>
             </form>
           )}
 
           {loading && !showForm ? (
-            <p className="text-center py-4">Loading holidays...</p>
+            <div className="text-center py-8">Loading...</div>
           ) : holidays.length === 0 ? (
-            <p className="text-center py-4">No holidays found for {year}.</p>
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              No holidays found for {year}
+            </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full">
+              <table className="w-full">
                 <thead>
-                  <tr className="bg-gray-100 dark:bg-gray-700">
-                    <th>Date</th>
-                    <th>Name</th>
-                    <th>Description</th>
-                    <th>Actions</th>
+                  <tr className="border-b dark:border-gray-700">
+                    <th className="text-left p-2">Name</th>
+                    <th className="text-left p-2">Date</th>
+                    <th className="text-left p-2">Description</th>
+                    <th className="text-left p-2">Type</th>
+                    <th className="text-left p-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {holidays.map((holiday) => (
                     <tr key={holiday.id} className="border-b dark:border-gray-700">
-                      <td>{formatDate(holiday.date)}</td>
-                      <td>{holiday.name}</td>
-                      <td>{holiday.description}</td>
-                      <td className="flex space-x-2">
-                        <button
-                          onClick={() => handleEdit(holiday)}
-                          className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => holiday.id && handleDelete(holiday.id)}
-                          className="px-3 py-1 text-sm bg-red-600 hover:bg-red-700 text-white rounded"
-                        >
-                          Delete
-                        </button>
+                      <td className="p-2">{holiday.name}</td>
+                      <td className="p-2">{formatDate(holiday.startDate)}</td>
+                      <td className="p-2">{holiday.description}</td>
+                      <td className="p-2">
+                        {holiday.isRecurring ? 'Recurring' : 'One-time'} 
+                        {holiday.type ? ` (${holiday.type})` : ''}
+                      </td>
+                      <td className="p-2">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleEdit(holiday)}
+                            className="text-blue-500 hover:text-blue-700"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(holiday.id!)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -323,26 +360,35 @@ export default function Home() {
               </table>
             </div>
           )}
-        </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold mb-4">API Testing</h2>
-          <div className="space-y-4">
-            <p>
-              You can test the API endpoints using tools like Postman, cURL, or directly from your application.
-            </p>
-            <p>
-              This interface provides a simple way to manage holidays and test the basic functionality.
-            </p>
-            <div className="mt-4">
-              <h3 className="text-lg font-medium">Sample Request</h3>
-              <pre className="bg-gray-100 dark:bg-gray-900 p-4 rounded-md overflow-x-auto mt-2">
-                {`fetch('/api/holidays?year=2024')
-  .then(response => response.json())
-  .then(data => console.log(data))
-  .catch(error => console.error('Error:', error));`}
-              </pre>
-            </div>
+          <div className="mt-6">
+            <button
+              onClick={async () => {
+                try {
+                  setLoading(true);
+                  setError(null);
+                  const response = await fetch('/api/holidays/import-static', {
+                    method: 'POST',
+                  });
+                  
+                  if (!response.ok) {
+                    throw new Error(`Error: ${response.status}`);
+                  }
+                  
+                  await fetchHolidays();
+                  alert('Static holidays imported successfully!');
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : 'An error occurred');
+                  console.error('Failed to import static holidays:', err);
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="btn-secondary"
+              disabled={loading}
+            >
+              Import Static Holidays
+            </button>
           </div>
         </div>
       </div>

@@ -6,8 +6,7 @@ import {
   query, 
   where, 
   addDoc, 
-  serverTimestamp,
-  Timestamp 
+  serverTimestamp
 } from 'firebase/firestore';
 import { Holiday } from '@/types/holiday';
 
@@ -338,9 +337,6 @@ async function handleUpcomingHolidays() {
     const today = new Date();
     const threeMonthsLater = new Date();
     threeMonthsLater.setMonth(today.getMonth() + 3);
-    
-    const startDateIso = today.toISOString();
-    const endDateIso = threeMonthsLater.toISOString();
     
     // Get all holidays
     const holidaysRef = collection(db, 'holidays');

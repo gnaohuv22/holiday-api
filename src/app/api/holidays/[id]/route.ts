@@ -10,12 +10,12 @@ import {
 
 // GET single holiday by ID
 export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     // Extract ID from params
-    const id = params.id;
+    const { id } = await context.params;
 
     const holidayRef = doc(db, 'holidays', id);
     const holidaySnap = await getDoc(holidayRef);
@@ -51,13 +51,13 @@ export async function GET(
 
 // PUT/update holiday by ID
 export async function PUT(
-  req: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     // Extract ID from params
-    const id = params.id;
-    const body = await req.json();
+    const { id } = await context.params;
+    const body = await request.json();
     const { 
       name, 
       description, 
@@ -120,12 +120,12 @@ export async function PUT(
 
 // DELETE holiday by ID
 export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     // Extract ID from params
-    const id = params.id;
+    const { id } = await context.params;
 
     // Check if holiday exists
     const holidayRef = doc(db, 'holidays', id);
