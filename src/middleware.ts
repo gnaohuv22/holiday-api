@@ -5,6 +5,7 @@ import type { NextRequest } from 'next/server';
 const allowedOrigins = [
   'http://localhost:3000',
   'https://holiday-api-ruby.vercel.app',
+  'https://otls-frontend.vercel.app'
   // Thêm các domain khác mà bạn muốn cho phép ở đây
 ];
 
